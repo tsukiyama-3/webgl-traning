@@ -2,10 +2,17 @@
 const canvas = ref<HTMLCanvasElement | null>(null);
 const gl: Ref<WebGLRenderingContext | null> = ref(null);
 
+const { createShader, createProgram } = useWebGL()
+
 const vshaderSource = `
-attribute vec4 a_position;
+attribute vec2 a_position;
+uniform vec2 u_resolution;
+
 void main() {
-  gl_Position = a_position;
+  vec2 zeroToOne = a_position / u_resolution;
+  vec2 zeroToTwo = zeroToOne * 2.0;
+  vec2 clipSpace = zeroToTwo - 1.0;
+  gl_Position = vec4(clipSpace, 0, 1);
 }
 `;
 
@@ -15,46 +22,6 @@ void main() {
   gl_FragColor = vec4(1, 0, 0.5, 1);
 }
 `;
-
-const createShader = (
-  gl: WebGLRenderingContext,
-  type: number,
-  source: string
-) => {
-  // シェーダーオブジェクトを作成
-  const shader = gl.createShader(type);
-  // GLSLのコードをGPUにアップロード シェーダーオブジェクトに対してシェーダーソースコードを設定している。
-  gl.shaderSource(shader!, source);
-  // シェーダーのコードをGPUで実行できるバイナリコードにコンパイルしている シェーダーオブジェクトに対してコンパイルしている コンパイル結果はシェーダーオブジェクトに直接保存される。
-  gl.compileShader(shader!);
-  const success = gl.getShaderParameter(shader!, gl.COMPILE_STATUS);
-  if (success) {
-    return shader;
-  }
-  console.log(gl.getShaderInfoLog(shader!));
-  gl.deleteShader(shader);
-};
-
-const createProgram = (
-  gl: WebGLRenderingContext,
-  vertexShader: WebGLShader,
-  fragmentShader: WebGLShader
-) => {
-  // 空のプログラムオブジェクトを作成
-  const program = gl.createProgram();
-  // プログラムオブジェクトに頂点シェーダーを付ける
-  gl.attachShader(program!, vertexShader);
-  // プログラムオブジェクトにフラグメントシェーダーを付ける
-  gl.attachShader(program!, fragmentShader);
-  // 追加したシェーダーをプログラムにリンクする
-  gl.linkProgram(program!);
-  const success = gl.getProgramParameter(program!, gl.LINK_STATUS);
-  if (success) {
-    return program;
-  }
-  console.log(gl.getProgramInfoLog(program!));
-  gl.deleteProgram(program);
-};
 
 onMounted(() => {
   canvas.value = document.querySelector("canvas");
@@ -84,7 +51,7 @@ onMounted(() => {
   const positionBuffer = gl.value?.createBuffer();
   // GPU上のメモリ内のバッファをアクティブにしている
   gl.value?.bindBuffer(gl.value.ARRAY_BUFFER, positionBuffer!);
-  const position = [0, 0, 0, 0.5, 0.7, 0];
+  const position = [10, 20, 80, 20, 10, 30, 10, 30, 80, 20, 80, 30];
   // 頂点データをGPU上のバッファにアップロードしている
   gl.value?.bufferData(
     gl.value.ARRAY_BUFFER,
@@ -102,6 +69,9 @@ onMounted(() => {
   // 属性オンにする。
   gl.value?.enableVertexAttribArray(positionAttributeLocation);
 
+  const resolutionUniformLocation = gl.value?.getUniformLocation(program!, "u_resolution");
+  gl.value?.uniform2f(resolutionUniformLocation!, gl.value.canvas.width, gl.value.canvas.height);
+
   const size = 2;
   const type = gl.value?.FLOAT;
   const normalize = false;
@@ -117,7 +87,7 @@ onMounted(() => {
     offset
   );
   const primitiveType = gl.value?.TRIANGLES;
-  const count = 3;
+  const count = 6;
   // 描画
   gl.value?.drawArrays(primitiveType!, offset, count);
 });
