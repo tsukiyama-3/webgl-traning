@@ -2,7 +2,7 @@
 const canvas = ref<HTMLCanvasElement | null>(null);
 const gl: Ref<WebGLRenderingContext | null> = ref(null);
 
-const { createShader, createProgram } = useWebGL()
+const { createShader, createProgram } = useWebGL();
 
 const vshaderSource = `
 attribute vec2 a_position;
@@ -18,10 +18,33 @@ void main() {
 
 const fshaderSource = `
 precision mediump float;
+uniform vec4 u_color;
 void main() {
-  gl_FragColor = vec4(1, 0, 0.5, 1);
+  gl_FragColor = u_color;
 }
 `;
+
+const setRectangle = (
+  gl: WebGLRenderingContext,
+  x: number,
+  y: number,
+  width: number,
+  height: number
+) => {
+  const x1 = x;
+  const x2 = x + width;
+  const y1 = y;
+  const y2 = y + height;
+  gl.bufferData(
+    gl.ARRAY_BUFFER,
+    new Float32Array([x1, y1, x2, y1, x1, y2, x1, y2, x2, y1, x2, y2]),
+    gl.STATIC_DRAW
+  );
+};
+
+const randomInt = (range: number) => {
+  return Math.floor(Math.random() * range);
+};
 
 onMounted(() => {
   canvas.value = document.querySelector("canvas");
@@ -69,8 +92,10 @@ onMounted(() => {
   // 属性オンにする。
   gl.value?.enableVertexAttribArray(positionAttributeLocation);
 
-  const resolutionUniformLocation = gl.value?.getUniformLocation(program!, "u_resolution");
-  gl.value?.uniform2f(resolutionUniformLocation!, gl.value.canvas.width, gl.value.canvas.height);
+  const resolutionUniformLocation = gl.value?.getUniformLocation(
+    program!,
+    "u_resolution"
+  );
 
   const size = 2;
   const type = gl.value?.FLOAT;
@@ -86,15 +111,45 @@ onMounted(() => {
     stride,
     offset
   );
-  const primitiveType = gl.value?.TRIANGLES;
-  const count = 6;
-  // 描画
-  gl.value?.drawArrays(primitiveType!, offset, count);
+
+  gl.value?.uniform2f(
+    resolutionUniformLocation!,
+    gl.value.canvas.width,
+    gl.value.canvas.height
+  );
+
+  const colorUniformLocation = gl.value?.getUniformLocation(
+    program!,
+    "u_color"
+  );
+
+  // 50このランダムな四角形をランダム色で描画する
+  for (let ii = 0; ii < 50; ++ii) {
+    setRectangle(
+      gl.value!,
+      randomInt(300),
+      randomInt(300),
+      randomInt(300),
+      randomInt(300)
+    );
+    gl.value?.uniform4f(
+      colorUniformLocation!,
+      Math.random(),
+      Math.random(),
+      Math.random(),
+      1
+    );
+
+    const primitiveType = gl.value?.TRIANGLES;
+    const offset = 0;
+    const count = 6;
+    gl.value?.drawArrays(primitiveType!, offset, count);
+  }
 });
 </script>
 
 <template>
   <div>
-    <canvas></canvas>
+    <canvas width="512" height="512"></canvas>
   </div>
 </template>
