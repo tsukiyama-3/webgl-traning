@@ -18,8 +18,8 @@ const dots = ref<Dot[]>([]);
 const editor = new Container();
 editor.x = 0;
 editor.y = 0;
-editor.width = 512;
-editor.height = 512;
+editor.width = dotSize * colNum;
+editor.height = dotSize * rowNum;
 editor.interactive = true;
 
 const fill = (dot: Dot, color: number, targetColor?: number) => {
@@ -116,8 +116,6 @@ const pointerdown = (e: any) => {
   }
 };
 
-const createImg = () => {};
-
 editor
   .on("pointerdown", pointerdown)
   .on("pointermove", draw)
@@ -125,13 +123,24 @@ editor
 
 const mode = ref("pen");
 
-const renderer = ref()
+const renderer = ref();
+const dataURL = ref();
+const completeImg = () => {
+  const canvas = renderer.value.plugins.extract.canvas(editor);
+  dataURL.value = canvas.toDataURL();
+};
+
+// zoom
+const scale = 1;
+const zoomSpeed = 0.1;
+const maxScale = 1;
+const minScale = 0.5;
 
 onMounted(async () => {
   const app = new Application({
     backgroundColor: 0x2c3e50,
-    width: 512,
-    height: 512,
+    width: dotSize * colNum,
+    height: dotSize * rowNum,
   });
   document.body.appendChild(app.view);
 
@@ -151,16 +160,8 @@ onMounted(async () => {
 
   app.stage.addChild(editor);
 
-  renderer.value = app.renderer
+  renderer.value = app.renderer;
 });
-
-const dataURL = ref()
-
-const completeImg = () => {
-  const canvas = renderer.value.plugins.extract.canvas(editor)
-  dataURL.value = canvas.toDataURL();
-}
-
 </script>
 
 <template>
