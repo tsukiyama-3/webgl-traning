@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Application, Container, Graphics } from "pixi.js";
+import { Application, Container, Graphics, RenderTexture } from "pixi.js";
 
 const dotSize = 16;
 const colNum = 32;
@@ -16,18 +16,18 @@ type Dot = {
 const dots = ref<Dot[]>([]);
 
 const editor = new Container();
-editor.x = 10;
+editor.x = 0;
 editor.y = 0;
 editor.width = 512;
 editor.height = 512;
 editor.interactive = true;
 
-const fill = (dot: any, color: number, targetColor?: number) => {
+const fill = (dot: Dot, color: number, targetColor?: number) => {
   if (dot.graphics.tint !== targetColor) {
     return;
   }
   if (dot.graphics.tint === color) {
-    return
+    return;
   }
   dot.graphics.tint = color;
   dot.color = color;
@@ -57,6 +57,7 @@ const createEditor = () => {
       };
       dots.value.push(dot);
       dot.graphics.beginFill(dot.color);
+      dot.graphics.lineStyle(2, 0xdddddd);
       dot.graphics.drawRect(dot.x * dotSize, dot.y * dotSize, dotSize, dotSize);
       dot.graphics.endFill();
       editor.addChild(dot.graphics);
@@ -65,7 +66,7 @@ const createEditor = () => {
   }
 };
 
-const visibleGrid = ref(false);
+const visibleGrid = ref(true);
 const useGrid = () => {
   visibleGrid.value = !visibleGrid.value;
   if (visibleGrid.value) {
@@ -104,39 +105,81 @@ const pointerdown = (e: any) => {
   const y = Math.floor(offsetY / dotSize);
   const dot = dots.value.find((dot) => dot.x === x && dot.y === y);
   if (dot) {
-    if (e.data.originalEvent.shiftKey) {
-      // shiftキーが押されている場合、塗りつぶし機能を呼び出す
+    if (mode.value === "fill") {
       const startTime = performance.now();
       fill(dot, currentColor.value, dot.graphics.tint);
       const endTime = performance.now();
       console.log(`fill実行時間: ${endTime - startTime} ミリ秒`);
-    } else {
-      // shiftキーが押されていない場合、ドットを塗りつぶす
+    } else if (mode.value === "pen") {
       draw(e);
     }
   }
 };
+
+const createImg = () => {};
 
 editor
   .on("pointerdown", pointerdown)
   .on("pointermove", draw)
   .on("pointerup", () => (dragFlug.value = false));
 
-onMounted(() => {
+const mode = ref("pen");
+
+const renderer = ref()
+
+onMounted(async () => {
   const app = new Application({
     backgroundColor: 0x2c3e50,
+    width: 512,
+    height: 512,
   });
   document.body.appendChild(app.view);
+
+  document.body.addEventListener("keydown", (event) => {
+    if (event.shiftKey && event.key === "G") {
+      useGrid();
+    }
+    if (event.key === "p") {
+      mode.value = "pen";
+    }
+    if (event.key === "f") {
+      mode.value = "fill";
+    }
+  });
 
   createEditor();
 
   app.stage.addChild(editor);
+
+  renderer.value = app.renderer
 });
+
+const dataURL = ref()
+
+const completeImg = () => {
+  const canvas = renderer.value.plugins.extract.canvas(editor)
+  dataURL.value = canvas.toDataURL();
+}
+
 </script>
 
 <template>
   <div>
     <input type="color" v-model="currentColor" />
-    <input type="checkbox" @change="useGrid" />
+    <input id="grid" type="checkbox" @change="useGrid" :checked="visibleGrid" />
+    <label for="grid">Grid</label>
+    <input
+      type="radio"
+      name="mode"
+      value="pen"
+      id="pen"
+      v-model="mode"
+      checked
+    />
+    <label for="pen">Pen</label>
+    <input type="radio" name="mode" value="fill" id="fill" v-model="mode" />
+    <label for="fill">Fill</label>
+    <button @click="completeImg">complete</button>
+    <a :href="dataURL" download="hoge.png">download</a>
   </div>
 </template>
