@@ -1,5 +1,9 @@
 <script setup lang="ts">
+import { mdiPencil, mdiFormatColorFill, mdiGridLarge, mdiDownload } from "@mdi/js";
 import { Application, Container, Graphics } from "pixi.js";
+
+const template = ref<HTMLElement | null>(null)
+const tools = ref<HTMLElement | null>(null)
 
 const dotSize = 16;
 const colNum = 32;
@@ -63,7 +67,7 @@ const createEditor = () => {
       };
       dots.value.push(dot);
       dot.graphics.beginFill(dot.color);
-      dot.graphics.lineStyle(1, 0xdddddd);
+      dot.graphics.lineStyle(1, 0xdddddd, 1, 0, false);
       dot.graphics.drawRect(dot.x * dotSize, dot.y * dotSize, dotSize, dotSize);
       dot.graphics.endFill();
       editor.addChild(dot.graphics);
@@ -77,12 +81,12 @@ const useGrid = () => {
   visibleGrid.value = !visibleGrid.value;
   if (visibleGrid.value) {
     dots.value.map((dot) => {
-      dot.graphics.lineStyle(1, 0xdddddd);
+      dot.graphics.lineStyle(1, 0xdddddd, 1, 0, false);
       dot.graphics.drawRect(dot.x * dotSize, dot.y * dotSize, dotSize, dotSize);
     });
   } else {
     dots.value.map((dot) => {
-      dot.graphics.lineStyle(1, 0xffffff);
+      dot.graphics.lineStyle(1, 0xffffff, 1, 0, false);
       dot.graphics.drawRect(dot.x * dotSize, dot.y * dotSize, dotSize, dotSize);
     });
   }
@@ -122,9 +126,7 @@ const pointerdown = (e: any) => {
   }
 };
 
-editor
-  .on("pointerdown", pointerdown)
-  .on("pointermove", draw)
+editor.on("pointerdown", pointerdown).on("pointermove", draw);
 
 const mode = ref("pen");
 
@@ -141,9 +143,10 @@ onMounted(async () => {
     width: dotSize * colNum,
     height: dotSize * rowNum,
   });
-  document.body.appendChild(app.view);
 
-  document.body.addEventListener('pointerup', () => (dragFlug.value = false))
+  template.value?.insertBefore(app.view, tools.value)
+
+  document.body.addEventListener("pointerup", () => (dragFlug.value = false));
 
   document.body.addEventListener("keydown", (event) => {
     if (event.shiftKey && event.key === "G") {
@@ -185,22 +188,113 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div>
-    <input type="color" v-model="currentColor" />
-    <input id="grid" type="checkbox" @change="useGrid" :checked="visibleGrid" />
-    <label for="grid">Grid</label>
-    <input
-      type="radio"
-      name="mode"
-      value="pen"
-      id="pen"
-      v-model="mode"
-      checked
-    />
-    <label for="pen">Pen</label>
-    <input type="radio" name="mode" value="fill" id="fill" v-model="mode" />
-    <label for="fill">Fill</label>
-    <button @click="completeImg">complete</button>
-    <a :href="dataURL" download="hoge.png">download</a>
+  <div ref="template" class="container">
+    <div ref="tools">
+      <input type="color" v-model="currentColor" />
+      <input id="grid" type="checkbox" @change="useGrid" :checked="visibleGrid" />
+      <label for="grid" class="label" :class="{ 'active-bg' : visibleGrid }">
+        <VIcon :icon="mdiGridLarge" size="36" :class="{ active : visibleGrid }" />
+      </label>
+      <input
+        type="radio"
+        name="mode"
+        value="pen"
+        id="pen"
+        v-model="mode"
+        checked
+      />
+      <input type="radio" name="mode" value="fill" id="fill" v-model="mode" />
+      <div class="mode-block">
+        <label for="pen" class="label" :class="{ 'active-bg' : mode === 'pen' }">
+          <VIcon :icon="mdiPencil" size="36" :class="{ active : mode === 'pen' }" />
+        </label>
+        <label for="fill" class="label" :class="{ 'active-bg' : mode === 'fill' }">
+          <VIcon :icon="mdiFormatColorFill" size="36" :class="{ active : mode === 'fill' }" />
+        </label>
+      </div>
+      <button @click="completeImg">complete</button>
+      <a :href="dataURL" download="hoge.png" class="label mt-1">
+        <VIcon :icon="mdiDownload" size="36" />
+      </a>
+    </div>
   </div>
 </template>
+
+<style scoped>
+.mt-1 {
+  margin-top: 8px;
+}
+
+.container {
+  display: flex;
+  justify-content: center;
+  column-gap: 2rem;
+}
+
+input[type="radio"] {
+  display: none;
+  -webkit-appearance: none;
+  display: block;
+  margin: 0;
+}
+
+input[type="checkbox"] {
+  -webkit-appearance: none;
+  display: block;
+}
+
+input[type="color"] {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  display: block;
+  margin: 0;
+  width: 54px;
+  height: 60px;
+  padding: 0;
+  background-color: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+input[type="color"]::-webkit-color-swatch {
+  border-radius: 50%;
+  border: 2px solid #dddddd;
+}
+
+input[type="color"]::-moz-color-swatch {
+  border-radius: 50%;
+  border: 2px solid #dddddd;
+}
+
+button {
+  display: block;
+}
+
+.active {
+  color: #FFFFFE;
+}
+
+.active-bg {
+  background-color: #1166DD;
+}
+
+.mode-block {
+  display: flex;
+  column-gap: 8px;
+  margin-bottom: 8px;
+  margin-top: 8px;
+}
+
+.label {
+  color: #1166DD;
+  border: 2px solid #1166DD;
+  display: inline-flex;
+  border-radius: 6px;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  cursor: pointer;
+}
+</style>
