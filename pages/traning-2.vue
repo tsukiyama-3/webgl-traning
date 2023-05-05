@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { mdiPencil, mdiFormatColorFill, mdiGridLarge, mdiDownload } from "@mdi/js";
+import {
+  mdiPencil,
+  mdiFormatColorFill,
+  mdiGridLarge,
+  mdiDownload,
+} from "@mdi/js";
 import { Application, Container, Graphics } from "pixi.js";
-
-const template = ref<HTMLElement | null>(null)
-const tools = ref<HTMLElement | null>(null)
 
 const dotSize = 16;
 const colNum = 32;
@@ -19,7 +21,6 @@ const minScale = 1;
 type Dot = {
   x: number;
   y: number;
-  color: number;
   graphics: Graphics;
 };
 
@@ -40,7 +41,6 @@ const fill = (dot: Dot, color: number, targetColor?: number) => {
     return;
   }
   dot.graphics.tint = color;
-  dot.color = color;
 
   const neighbors = [
     dots.value.find((d) => d.x === dot.x - 1 && d.y === dot.y),
@@ -66,7 +66,7 @@ const createEditor = () => {
         graphics: new Graphics(),
       };
       dots.value.push(dot);
-      dot.graphics.beginFill(dot.color);
+      dot.graphics.beginFill(dot.graphics.tint);
       dot.graphics.lineStyle(1, 0xdddddd, 1, 0, false);
       dot.graphics.drawRect(dot.x * dotSize, dot.y * dotSize, dotSize, dotSize);
       dot.graphics.endFill();
@@ -131,20 +131,23 @@ editor.on("pointerdown", pointerdown).on("pointermove", draw);
 const mode = ref("pen");
 
 const renderer = ref();
-const dataURL = ref();
-const completeImg = () => {
+const downloadImg = () => {
   const canvas = renderer.value.plugins.extract.canvas(editor);
-  dataURL.value = canvas.toDataURL();
+  const link = document.createElement("a");
+  link.download = "image.png";
+  link.href = canvas.toDataURL();
+  link.click();
 };
 
-onMounted(async () => {
+onMounted(() => {
   const app = new Application({
     backgroundColor: 0x2c3e50,
     width: dotSize * colNum,
     height: dotSize * rowNum,
   });
 
-  template.value?.insertBefore(app.view, tools.value)
+  const canvasContainer = document.getElementById('canvas')
+  canvasContainer.appendChild(app.view)
 
   document.body.addEventListener("pointerup", () => (dragFlug.value = false));
 
@@ -188,12 +191,25 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div ref="template" class="container">
-    <div ref="tools">
+  <div class="container">
+    <div
+      id="canvas"
+      :class="{ pen: mode === 'pen', fill: mode === 'fill' }"
+    ></div>
+    <div>
       <input type="color" v-model="currentColor" />
-      <input id="grid" type="checkbox" @change="useGrid" :checked="visibleGrid" />
-      <label for="grid" class="label" :class="{ 'active-bg' : visibleGrid }">
-        <VIcon :icon="mdiGridLarge" size="36" :class="{ active : visibleGrid }" />
+      <input
+        id="grid"
+        type="checkbox"
+        @change="useGrid"
+        :checked="visibleGrid"
+      />
+      <label for="grid" class="label" :class="{ 'active-bg': visibleGrid }">
+        <VIcon
+          :icon="mdiGridLarge"
+          size="36"
+          :class="{ active: visibleGrid }"
+        />
       </label>
       <input
         type="radio"
@@ -205,17 +221,28 @@ onMounted(async () => {
       />
       <input type="radio" name="mode" value="fill" id="fill" v-model="mode" />
       <div class="mode-block">
-        <label for="pen" class="label" :class="{ 'active-bg' : mode === 'pen' }">
-          <VIcon :icon="mdiPencil" size="36" :class="{ active : mode === 'pen' }" />
+        <label for="pen" class="label" :class="{ 'active-bg': mode === 'pen' }">
+          <VIcon
+            :icon="mdiPencil"
+            size="36"
+            :class="{ active: mode === 'pen' }"
+          />
         </label>
-        <label for="fill" class="label" :class="{ 'active-bg' : mode === 'fill' }">
-          <VIcon :icon="mdiFormatColorFill" size="36" :class="{ active : mode === 'fill' }" />
+        <label
+          for="fill"
+          class="label"
+          :class="{ 'active-bg': mode === 'fill' }"
+        >
+          <VIcon
+            :icon="mdiFormatColorFill"
+            size="36"
+            :class="{ active: mode === 'fill' }"
+          />
         </label>
       </div>
-      <button @click="completeImg">complete</button>
-      <a :href="dataURL" download="hoge.png" class="label mt-1">
+      <button @click="downloadImg">
         <VIcon :icon="mdiDownload" size="36" />
-      </a>
+      </button>
     </div>
   </div>
 </template>
@@ -268,15 +295,32 @@ input[type="color"]::-moz-color-swatch {
 }
 
 button {
-  display: block;
+  color: #1166dd;
+  border: 2px solid #1166dd;
+  display: inline-flex;
+  border-radius: 6px;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  background-color: #ffffff;
+  cursor: pointer;
 }
 
 .active {
-  color: #FFFFFE;
+  color: #fffffe;
+}
+
+.pen {
+  cursor: url("assets/pencil.svg") 4 12, default;
+}
+
+.fill {
+  cursor: url("assets/fill.svg") 4 12, default;
 }
 
 .active-bg {
-  background-color: #1166DD;
+  background-color: #1166dd;
 }
 
 .mode-block {
@@ -287,8 +331,8 @@ button {
 }
 
 .label {
-  color: #1166DD;
-  border: 2px solid #1166DD;
+  color: #1166dd;
+  border: 2px solid #1166dd;
   display: inline-flex;
   border-radius: 6px;
   align-items: center;
