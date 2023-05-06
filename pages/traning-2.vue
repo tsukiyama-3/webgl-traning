@@ -62,7 +62,6 @@ const createEditor = () => {
       const dot: Dot = {
         x: c,
         y: r,
-        color: 0xffffff,
         graphics: new Graphics(),
       };
       dots.value.push(dot);
@@ -139,6 +138,24 @@ const downloadImg = () => {
   link.click();
 };
 
+// state
+
+const saveState = () => {
+  // state.value.push(JSON.stringify(dots.value));
+  // console.log(JSON.stringify(dots.value));
+};
+
+// undo
+const undoState = () => {
+  
+};
+
+watchEffect(() => {
+  if (dragFlug.value === false) {
+    saveState();
+  }
+});
+
 onMounted(() => {
   const app = new Application({
     backgroundColor: 0x2c3e50,
@@ -146,8 +163,8 @@ onMounted(() => {
     height: dotSize * rowNum,
   });
 
-  const canvasContainer = document.getElementById('canvas')
-  canvasContainer.appendChild(app.view)
+  const canvasContainer = document.getElementById("canvas");
+  canvasContainer.appendChild(app.view);
 
   document.body.addEventListener("pointerup", () => (dragFlug.value = false));
 
