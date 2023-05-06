@@ -146,15 +146,38 @@ const saveState = () => {
 };
 
 // undo
-const undoState = () => {
-  
-};
+const undoState = () => {};
 
 watchEffect(() => {
   if (dragFlug.value === false) {
     saveState();
   }
 });
+
+// key down
+const keydown = (e) => {
+  if (e.shiftKey && e.key === "G") {
+    useGrid();
+  }
+  if (e.key === "p") {
+    mode.value = "pen";
+  }
+  if (e.key === "f") {
+    mode.value = "fill";
+  }
+  if (e.key === "ArrowUp") {
+    editor.y -= dotSize;
+  }
+  if (e.key === "ArrowDown") {
+    editor.y += dotSize;
+  }
+  if (e.key === "ArrowLeft") {
+    editor.x -= dotSize;
+  }
+  if (e.key === "ArrowRight") {
+    editor.x += dotSize;
+  }
+};
 
 onMounted(() => {
   const app = new Application({
@@ -168,29 +191,7 @@ onMounted(() => {
 
   document.body.addEventListener("pointerup", () => (dragFlug.value = false));
 
-  document.body.addEventListener("keydown", (event) => {
-    if (event.shiftKey && event.key === "G") {
-      useGrid();
-    }
-    if (event.key === "p") {
-      mode.value = "pen";
-    }
-    if (event.key === "f") {
-      mode.value = "fill";
-    }
-    if (event.key === "ArrowUp") {
-      editor.y -= dotSize;
-    }
-    if (event.key === "ArrowDown") {
-      editor.y += dotSize;
-    }
-    if (event.key === "ArrowLeft") {
-      editor.x -= dotSize;
-    }
-    if (event.key === "ArrowRight") {
-      editor.x += dotSize;
-    }
-  });
+  document.body.addEventListener("keydown", keydown);
 
   renderer.value = app.renderer;
 
