@@ -271,6 +271,7 @@ onMounted(() => {
 }
 
 .container {
+  margin-top: 4rem;
   display: flex;
   justify-content: center;
   column-gap: 2rem;
