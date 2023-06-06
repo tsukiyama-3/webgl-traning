@@ -14,6 +14,8 @@ const previousRow = ref(0);
 
 pixels.value = new Uint32Array(canvasSize * canvasSize);
 
+const pixelsState = ref([]);
+
 const onCanvasMousemove = (event: MouseEvent) => {
   coords.value = getRelativeCoordinates(event.clientX, event.clientY);
   if (isClicked.value) {
@@ -21,7 +23,12 @@ const onCanvasMousemove = (event: MouseEvent) => {
       Math.abs(coords.value.x - previousCol.value) > 1 ||
       Math.abs(coords.value.y - previousRow.value) > 1
     ) {
-      const interpolatedPixels = getLinePixels(coords.value.x, previousCol.value, coords.value.y, previousRow.value)
+      const interpolatedPixels = getLinePixels(
+        coords.value.x,
+        previousCol.value,
+        coords.value.y,
+        previousRow.value
+      );
       for (let i = 0, l = interpolatedPixels.length; i < l; i++) {
         const coords = interpolatedPixels[i];
         drawAt(coords.col, coords.row);
@@ -29,8 +36,8 @@ const onCanvasMousemove = (event: MouseEvent) => {
     } else {
       drawAt(coords.value.x, coords.value.y);
     }
-    previousCol.value = coords.value.x
-    previousRow.value = coords.value.y
+    previousCol.value = coords.value.x;
+    previousRow.value = coords.value.y;
   }
 };
 
@@ -47,10 +54,6 @@ const onCanvasMousedown = (event: MouseEvent) => {
     const endTime = performance.now();
     console.log(`fill実行時間: ${endTime - startTime} ミリ秒`);
   }
-};
-
-const onCanvasMouseup = () => {
-  isClicked.value = false;
 };
 
 // ピクセル座標を返す
@@ -88,24 +91,112 @@ const fillAt = (x: number, y: number) => {
   }
 };
 
+onMounted(() => {
+  const context = canvas.value.getContext("2d");
+  const currentState = context.getImageData(0, 0, canvasSize, canvasSize);
+  pixelsState.value.push(new ImageData(new Uint8ClampedArray(currentState.data), currentState.width, currentState.height));
+});
+
+const onCanvasMouseup = () => {
+  isClicked.value = false;
+  const context = canvas.value.getContext("2d");
+  const currentState = context.getImageData(0, 0, canvasSize, canvasSize);
+  pixelsState.value.push(new ImageData(new Uint8ClampedArray(currentState.data), currentState.width, currentState.height));
+};
+
 // ピクセルを描画する
 const renderPixel = () => {
+  // コンテキスト取得
   const context = canvas.value.getContext("2d");
+  // ドットを滑らかにする
   context.imageSmoothingEnabled = false;
+  // offscreenCanvasを作成
   const offscreenCanvas = document.createElement("canvas");
+  // コンテキスト取得
   const offscreenContext = offscreenCanvas.getContext("2d");
+  // width height を設定
   offscreenCanvas.width = canvasSize;
   offscreenCanvas.height = canvasSize;
+  // imageDataを作成(width・height・dataが入っている)
   const imageData = offscreenContext?.createImageData(canvasSize, canvasSize);
+  // imageData.dataをimgDataDataに代入
   const imgDataData = imageData?.data;
+  // pixels.value.bufferをUint8ClampedArrayの形式でdataに代入
+  console.log(pixels.value, 'pixels.value1')
   const data = new Uint8ClampedArray(pixels.value.buffer);
+  // imgDataDataにdataをコピー
   imgDataData?.set(data);
+  // imageDataをoffscreenContextに反映
   offscreenContext?.putImageData(imageData!, 0, 0);
+  // コンテキストをクリアにする
   context.clearRect(0, 0, canvasSize, canvasSize);
+  // 描画の状態をスタックに保存している
   context.save();
+  // 描画コンテキストをスケーリングしている
   context.scale(dotSize, dotSize);
+  // offscreenCanvasの内容をキャンバスコンテキストに描画している
   context.drawImage(offscreenCanvas, 0, 0);
   context.restore();
+};
+const renderPixel2 = () => {
+  // コンテキスト取得
+  const context = canvas.value.getContext("2d");
+  // ドットを滑らかにする
+  context.imageSmoothingEnabled = false;
+  // offscreenCanvasを作成
+  const offscreenCanvas = document.createElement("canvas");
+  // コンテキスト取得
+  const offscreenContext = offscreenCanvas.getContext("2d");
+  // width height を設定
+  offscreenCanvas.width = canvasSize;
+  offscreenCanvas.height = canvasSize;
+  // imageDataを作成(width・height・dataが入っている)
+  const imageData = offscreenContext?.createImageData(canvasSize, canvasSize);
+  // imageData.dataをimgDataDataに代入
+  const imgDataData = imageData?.data;
+  // pixels.value.bufferをUint8ClampedArrayの形式でdataに代入
+  console.log(pixels.value.buffer, 'pixels.value3')
+  const data = new Uint8ClampedArray(pixels.value.buffer);
+  // imgDataDataにdataをコピー
+  imgDataData?.set(data);
+  // imageDataをoffscreenContextに反映
+  offscreenContext?.putImageData(imageData!, 0, 0);
+  // コンテキストをクリアにする
+  context.clearRect(0, 0, canvasSize, canvasSize);
+  // 描画の状態をスタックに保存している
+  context.save();
+  // 描画コンテキストをスケーリングしている
+  // offscreenCanvasの内容をキャンバスコンテキストに描画している
+  context.drawImage(offscreenCanvas, 0, 0);
+  context.restore();
+};
+
+const undo = () => {
+  console.log(pixelsState.value, 'pixelsState.value')
+  if (pixelsState.value.length > 1) {
+    const previousState = pixelsState.value[pixelsState.value.length - 2];
+    pixels.value = imageDataToUint32Array(previousState)
+    console.log(pixels.value.buffer, 'pixels.value2')
+    renderPixel2();
+    pixelsState.value.pop();
+  }
+};
+
+const imageDataToUint32Array = (imageData) => {
+  const { width, height, data } = imageData;
+  console.log(width, height)
+  const pixelArray = new Uint32Array(width * height);
+
+  for (let i = 0, j = 0; i < data.length; i += 4, j++) {
+    const red = data[i];
+    const green = data[i + 1];
+    const blue = data[i + 2];
+    const alpha = data[i + 3];
+    const color = (alpha << 24) | (blue << 16) | (green << 8) | red;
+    pixelArray[j] = color;
+  }
+
+  return pixelArray;
 };
 
 // 隣接するピクセルを取得する
@@ -196,12 +287,12 @@ const getLinePixels = (x0: number, x1: number, y0: number, y1: number) => {
 };
 
 const normalize = (value: number, def: number) => {
-  if (typeof value === 'undefined' || value === null) {
+  if (typeof value === "undefined" || value === null) {
     return def;
   } else {
     return value;
   }
-}
+};
 
 const colorToInt = (color: string) => {
   const hex = color.replace("#", "");
@@ -234,4 +325,6 @@ const colorToInt = (color: string) => {
   <input type="radio" name="mode" value="pen" id="pen" v-model="mode" />
   <label for="pen">pen</label>
   <p>{{ coords }}</p>
+  <button @click="undo">Undo</button>
+  <p v-for="pixel in pixelsState">{{ pixel.data }}</p>
 </template>
