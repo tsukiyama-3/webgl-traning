@@ -14,7 +14,20 @@ const previousRow = ref(0);
 
 pixels.value = new Uint32Array(canvasSize * canvasSize);
 
-const pixelsState = ref([]);
+const undoPixelsStates = ref([]);
+const redoPixelsStates = ref([]);
+
+const init = () => {
+  const context = canvas.value.getContext("2d");
+  context.imageSmoothingEnabled = false;
+  context.scale(dotSize, dotSize);
+}
+
+onMounted(() => {
+  const imageData = uint32ArrayToImageData(pixels.value, canvasSize, canvasSize);
+  undoPixelsStates.value.push(imageData);
+  init()
+})
 
 const onCanvasMousemove = (event: MouseEvent) => {
   coords.value = getRelativeCoordinates(event.clientX, event.clientY);
@@ -69,6 +82,7 @@ const drawAt = (x: number, y: number) => {
   if (containsPixel(x, y)) {
     setPixelColor(x, y, colorToInt(currentColor.value));
     renderPixel();
+    redoPixelsStates.value = []
   }
 };
 
@@ -88,28 +102,20 @@ const fillAt = (x: number, y: number) => {
       }
     });
     renderPixel();
+    redoPixelsStates.value = []
   }
 };
 
-onMounted(() => {
-  const context = canvas.value.getContext("2d");
-  const currentState = context.getImageData(0, 0, canvasSize, canvasSize);
-  pixelsState.value.push(new ImageData(new Uint8ClampedArray(currentState.data), currentState.width, currentState.height));
-});
-
 const onCanvasMouseup = () => {
   isClicked.value = false;
-  const context = canvas.value.getContext("2d");
-  const currentState = context.getImageData(0, 0, canvasSize, canvasSize);
-  pixelsState.value.push(new ImageData(new Uint8ClampedArray(currentState.data), currentState.width, currentState.height));
+  const imageData = uint32ArrayToImageData(pixels.value, canvasSize, canvasSize);
+  undoPixelsStates.value.push(imageData);
 };
 
 // ピクセルを描画する
 const renderPixel = () => {
   // コンテキスト取得
   const context = canvas.value.getContext("2d");
-  // ドットを滑らかにする
-  context.imageSmoothingEnabled = false;
   // offscreenCanvasを作成
   const offscreenCanvas = document.createElement("canvas");
   // コンテキスト取得
@@ -122,7 +128,6 @@ const renderPixel = () => {
   // imageData.dataをimgDataDataに代入
   const imgDataData = imageData?.data;
   // pixels.value.bufferをUint8ClampedArrayの形式でdataに代入
-  console.log(pixels.value, 'pixels.value1')
   const data = new Uint8ClampedArray(pixels.value.buffer);
   // imgDataDataにdataをコピー
   imgDataData?.set(data);
@@ -132,59 +137,31 @@ const renderPixel = () => {
   context.clearRect(0, 0, canvasSize, canvasSize);
   // 描画の状態をスタックに保存している
   context.save();
-  // 描画コンテキストをスケーリングしている
-  context.scale(dotSize, dotSize);
-  // offscreenCanvasの内容をキャンバスコンテキストに描画している
-  context.drawImage(offscreenCanvas, 0, 0);
-  context.restore();
-};
-const renderPixel2 = () => {
-  // コンテキスト取得
-  const context = canvas.value.getContext("2d");
-  // ドットを滑らかにする
-  context.imageSmoothingEnabled = false;
-  // offscreenCanvasを作成
-  const offscreenCanvas = document.createElement("canvas");
-  // コンテキスト取得
-  const offscreenContext = offscreenCanvas.getContext("2d");
-  // width height を設定
-  offscreenCanvas.width = canvasSize;
-  offscreenCanvas.height = canvasSize;
-  // imageDataを作成(width・height・dataが入っている)
-  const imageData = offscreenContext?.createImageData(canvasSize, canvasSize);
-  // imageData.dataをimgDataDataに代入
-  const imgDataData = imageData?.data;
-  // pixels.value.bufferをUint8ClampedArrayの形式でdataに代入
-  console.log(pixels.value.buffer, 'pixels.value3')
-  const data = new Uint8ClampedArray(pixels.value.buffer);
-  // imgDataDataにdataをコピー
-  imgDataData?.set(data);
-  // imageDataをoffscreenContextに反映
-  offscreenContext?.putImageData(imageData!, 0, 0);
-  // コンテキストをクリアにする
-  context.clearRect(0, 0, canvasSize, canvasSize);
-  // 描画の状態をスタックに保存している
-  context.save();
-  // 描画コンテキストをスケーリングしている
   // offscreenCanvasの内容をキャンバスコンテキストに描画している
   context.drawImage(offscreenCanvas, 0, 0);
   context.restore();
 };
 
 const undo = () => {
-  console.log(pixelsState.value, 'pixelsState.value')
-  if (pixelsState.value.length > 1) {
-    const previousState = pixelsState.value[pixelsState.value.length - 2];
+  if (undoPixelsStates.value.length > 1) {
+    const previousState = undoPixelsStates.value[undoPixelsStates.value.length - 2];
     pixels.value = imageDataToUint32Array(previousState)
-    console.log(pixels.value.buffer, 'pixels.value2')
-    renderPixel2();
-    pixelsState.value.pop();
+    renderPixel();
+    redoPixelsStates.value.push(undoPixelsStates.value.pop());
   }
 };
 
-const imageDataToUint32Array = (imageData) => {
+const redo = () => {
+  if (redoPixelsStates.value.length > 0) {
+    const nextState = redoPixelsStates.value.pop();
+    pixels.value = imageDataToUint32Array(nextState);
+    renderPixel();
+    undoPixelsStates.value.push(nextState);
+  }
+};
+
+const imageDataToUint32Array = (imageData: ImageData) => {
   const { width, height, data } = imageData;
-  console.log(width, height)
   const pixelArray = new Uint32Array(width * height);
 
   for (let i = 0, j = 0; i < data.length; i += 4, j++) {
@@ -197,6 +174,24 @@ const imageDataToUint32Array = (imageData) => {
   }
 
   return pixelArray;
+};
+
+const uint32ArrayToImageData = (array, width, height) => {
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d");
+  const imageData = context.createImageData(width, height);
+  const data = imageData.data;
+
+  // Uint32Array のデータを ImageData のデータにコピーする
+  for (let i = 0, j = 0; i < array.length; i++, j += 4) {
+    const pixel = array[i];
+    data[j] = pixel & 0xFF; // Red コンポーネント
+    data[j + 1] = (pixel >> 8) & 0xFF; // Green コンポーネント
+    data[j + 2] = (pixel >> 16) & 0xFF; // Blue コンポーネント
+    data[j + 3] = (pixel >> 24) & 0xFF; // Alpha コンポーネント
+  }
+
+  return imageData;
 };
 
 // 隣接するピクセルを取得する
@@ -326,5 +321,9 @@ const colorToInt = (color: string) => {
   <label for="pen">pen</label>
   <p>{{ coords }}</p>
   <button @click="undo">Undo</button>
-  <p v-for="pixel in pixelsState">{{ pixel.data }}</p>
+  <button @click="redo">Redo</button>
+  <p>undo {{ undoPixelsStates.length }}</p>
+  <p v-for="pixel in undoPixelsStates">{{ pixel.data }}</p>
+  <p>redo {{ redoPixelsStates.length }}</p>
+  <p v-for="pixel in redoPixelsStates">{{ pixel.data }}</p>
 </template>
