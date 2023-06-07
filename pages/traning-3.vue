@@ -6,28 +6,31 @@ const dotSize = 8;
 const coords = ref();
 const currentColor = ref("#000000");
 const mode = ref("pen");
-
+const visibleGrid = ref(false);
 const pixels = ref();
-
 const previousCol = ref(0);
 const previousRow = ref(0);
-
-pixels.value = new Uint32Array(canvasSize * canvasSize);
-
 const undoPixelsStates = ref([]);
 const redoPixelsStates = ref([]);
+const originalColor = ref<number | null>(null);
+const originalCoords = ref<{ x: number; y: number } | null>(null);
+pixels.value = new Uint32Array(canvasSize * canvasSize);
 
 const init = () => {
   const context = canvas.value.getContext("2d");
   context.imageSmoothingEnabled = false;
   context.scale(dotSize, dotSize);
-}
+};
 
 onMounted(() => {
-  const imageData = uint32ArrayToImageData(pixels.value, canvasSize, canvasSize);
+  const imageData = uint32ArrayToImageData(
+    pixels.value,
+    canvasSize,
+    canvasSize
+  );
   undoPixelsStates.value.push(imageData);
-  init()
-})
+  init();
+});
 
 const onCanvasMousemove = (event: MouseEvent) => {
   coords.value = getRelativeCoordinates(event.clientX, event.clientY);
@@ -52,6 +55,7 @@ const onCanvasMousemove = (event: MouseEvent) => {
     previousCol.value = coords.value.x;
     previousRow.value = coords.value.y;
   }
+  hoverAt(coords.value.x, coords.value.y);
 };
 
 const onCanvasMousedown = (event: MouseEvent) => {
@@ -67,6 +71,8 @@ const onCanvasMousedown = (event: MouseEvent) => {
     const endTime = performance.now();
     console.log(`fill実行時間: ${endTime - startTime} ミリ秒`);
   }
+  const originalPixelColor = getPixelColor(coords.value.x, coords.value.y);
+  originalColor.value = originalPixelColor;
 };
 
 // ピクセル座標を返す
@@ -82,19 +88,18 @@ const drawAt = (x: number, y: number) => {
   if (containsPixel(x, y)) {
     setPixelColor(x, y, colorToInt(currentColor.value));
     renderPixel();
-    redoPixelsStates.value = []
+    redoPixelsStates.value = [];
   }
 };
 
 const fillAt = (x: number, y: number) => {
   if (containsPixel(x, y)) {
-    const targetColor = getPixelColor(x, y);
     const startPixel = {
       col: x,
       row: y,
     };
     visitConnectedPixels(startPixel, (pixle: any) => {
-      if (getPixelColor(pixle.col, pixle.row) === targetColor) {
+      if (getPixelColor(pixle.col, pixle.row) === originalColor.value) {
         setPixelColor(pixle.col, pixle.row, colorToInt(currentColor.value));
         return true;
       } else {
@@ -102,13 +107,36 @@ const fillAt = (x: number, y: number) => {
       }
     });
     renderPixel();
-    redoPixelsStates.value = []
+    redoPixelsStates.value = [];
+  }
+};
+
+const hoverAt = (x: number, y: number) => {
+  if (originalCoords.value) {
+    // 元の色に戻す
+    setPixelColor(
+      originalCoords.value.x,
+      originalCoords.value.y,
+      originalColor.value!
+    );
+    renderPixel();
+  }
+  if (containsPixel(x, y)) {
+    // 新しい座標の色を変更する
+    originalColor.value = getPixelColor(x, y);
+    originalCoords.value = { x, y };
+    setPixelColor(x, y, colorToInt(currentColor.value));
+    renderPixel();
   }
 };
 
 const onCanvasMouseup = () => {
   isClicked.value = false;
-  const imageData = uint32ArrayToImageData(pixels.value, canvasSize, canvasSize);
+  const imageData = uint32ArrayToImageData(
+    pixels.value,
+    canvasSize,
+    canvasSize
+  );
   undoPixelsStates.value.push(imageData);
 };
 
@@ -140,12 +168,16 @@ const renderPixel = () => {
   // offscreenCanvasの内容をキャンバスコンテキストに描画している
   context.drawImage(offscreenCanvas, 0, 0);
   context.restore();
+  if (visibleGrid.value) {
+    addGrid();
+  }
 };
 
 const undo = () => {
   if (undoPixelsStates.value.length > 1) {
-    const previousState = undoPixelsStates.value[undoPixelsStates.value.length - 2];
-    pixels.value = imageDataToUint32Array(previousState)
+    const previousState =
+      undoPixelsStates.value[undoPixelsStates.value.length - 2];
+    pixels.value = imageDataToUint32Array(previousState);
     renderPixel();
     redoPixelsStates.value.push(undoPixelsStates.value.pop());
   }
@@ -158,6 +190,13 @@ const redo = () => {
     renderPixel();
     undoPixelsStates.value.push(nextState);
   }
+};
+
+const downloadImage = () => {
+  const link = document.createElement("a");
+  link.href = canvas.value.toDataURL();
+  link.download = "image.png";
+  link.click();
 };
 
 const imageDataToUint32Array = (imageData: ImageData) => {
@@ -185,10 +224,10 @@ const uint32ArrayToImageData = (array, width, height) => {
   // Uint32Array のデータを ImageData のデータにコピーする
   for (let i = 0, j = 0; i < array.length; i++, j += 4) {
     const pixel = array[i];
-    data[j] = pixel & 0xFF; // Red コンポーネント
-    data[j + 1] = (pixel >> 8) & 0xFF; // Green コンポーネント
-    data[j + 2] = (pixel >> 16) & 0xFF; // Blue コンポーネント
-    data[j + 3] = (pixel >> 24) & 0xFF; // Alpha コンポーネント
+    data[j] = pixel & 0xff; // Red コンポーネント
+    data[j + 1] = (pixel >> 8) & 0xff; // Green コンポーネント
+    data[j + 2] = (pixel >> 16) & 0xff; // Blue コンポーネント
+    data[j + 3] = (pixel >> 24) & 0xff; // Alpha コンポーネント
   }
 
   return imageData;
@@ -254,6 +293,49 @@ const containsPixel = (col: number, row: number) => {
   return col >= 0 && row >= 0 && col < canvasSize && row < canvasSize;
 };
 
+const addGrid = () => {
+  // 既存のキャンバスに罫線を描画する関数
+  const context = canvas.value.getContext("2d");
+  context.strokeStyle = "rgba(0, 0, 0, 1)";
+  context.lineWidth = 1 / 64;
+
+  // 横の罫線を描画
+  for (let x = 1; x < canvasSize; x += 1) {
+    context.beginPath();
+    context.moveTo(x, 0);
+    context.lineTo(x, canvasSize);
+    context.stroke();
+  }
+
+  // 縦の罫線を描画
+  for (let y = 1; y < canvasSize; y += 1) {
+    context.beginPath();
+    context.moveTo(0, y);
+    context.lineTo(canvasSize, y);
+    context.stroke();
+  }
+};
+
+const toggleGrid = () => {
+  visibleGrid.value = !visibleGrid.value;
+  if (visibleGrid.value) {
+    renderPixel();
+  } else {
+    renderPixel();
+  }
+};
+
+const clear = () => {
+  pixels.value = new Uint32Array(canvasSize * canvasSize);
+  const imageData = uint32ArrayToImageData(
+    pixels.value,
+    canvasSize,
+    canvasSize
+  );
+  undoPixelsStates.value.push(imageData);
+  renderPixel()
+}
+
 const getLinePixels = (x0: number, x1: number, y0: number, y1: number) => {
   const pixels = [];
   x1 = normalize(x1, 0);
@@ -289,41 +371,61 @@ const normalize = (value: number, def: number) => {
   }
 };
 
-const colorToInt = (color: string) => {
+const colorToInt = (color: string, alpha: number = 255) => {
   const hex = color.replace("#", "");
   const red = parseInt(hex.substr(0, 2), 16);
   const green = parseInt(hex.substr(2, 2), 16);
   const blue = parseInt(hex.substr(4, 2), 16);
-  const alpha = 255;
   const colorInt = ((alpha << 24) >>> 0) + (blue << 16) + (green << 8) + red;
   return colorInt;
 };
 </script>
 
 <template>
-  <div
-    style="background-color: #eee; padding-top: 100px"
-    @mousemove="onCanvasMousemove"
-    @mousedown="onCanvasMousedown"
-    @mouseup="onCanvasMouseup"
-  >
-    <canvas
-      ref="canvas"
-      :width="512"
-      :height="512"
-      style="border: 1px solid #000"
-    ></canvas>
+  <div class="container">
+    <div
+      style="padding-top: 80px; padding-left: 80px;"
+      @mousemove="onCanvasMousemove"
+      @mousedown="onCanvasMousedown"
+      @mouseup="onCanvasMouseup"
+    >
+      <canvas
+        ref="canvas"
+        :width="512"
+        :height="512"
+        style="border: 1px solid #000"
+      ></canvas>
+    </div>
+    <div>
+      <input type="color" v-model="currentColor" />
+      <input
+        type="radio"
+        name="mode"
+        value="bucket"
+        id="bucket"
+        v-model="mode"
+      />
+      <label for="bucket">bucket</label>
+      <input type="radio" name="mode" value="pen" id="pen" v-model="mode" />
+      <label for="pen">pen</label>
+      <p>{{ coords }}</p>
+      <button @click="downloadImage">Download</button>
+      <button @click="toggleGrid">Grid</button>
+      <button @click="clear">Clear</button>
+      <button @click="undo">Undo</button>
+      <button @click="redo">Redo</button>
+      <p>undo {{ undoPixelsStates.length }}</p>
+      <p v-for="pixel in undoPixelsStates">{{ pixel.data }}</p>
+      <p>redo {{ redoPixelsStates.length }}</p>
+      <p v-for="pixel in redoPixelsStates">{{ pixel.data }}</p>
+    </div>
   </div>
-  <input type="color" v-model="currentColor" />
-  <input type="radio" name="mode" value="bucket" id="bucket" v-model="mode" />
-  <label for="bucket">bucket</label>
-  <input type="radio" name="mode" value="pen" id="pen" v-model="mode" />
-  <label for="pen">pen</label>
-  <p>{{ coords }}</p>
-  <button @click="undo">Undo</button>
-  <button @click="redo">Redo</button>
-  <p>undo {{ undoPixelsStates.length }}</p>
-  <p v-for="pixel in undoPixelsStates">{{ pixel.data }}</p>
-  <p>redo {{ redoPixelsStates.length }}</p>
-  <p v-for="pixel in redoPixelsStates">{{ pixel.data }}</p>
 </template>
+
+<style scoped>
+.container {
+  display: grid;
+  grid-template-columns: 50% 50%;
+  height: 100vh;
+}
+</style>
