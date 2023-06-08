@@ -1,7 +1,8 @@
 <script setup lang="ts">
 const canvas = ref();
+const preview = ref()
 const isClicked = ref(false);
-const canvasSize = 64;
+const canvasSize = 32;
 const dotSize = 16;
 const coords = ref();
 const currentColor = ref("#ff0000");
@@ -21,6 +22,9 @@ const init = () => {
   const context = canvas.value.getContext("2d");
   context.imageSmoothingEnabled = false;
   context.scale(dotSize, dotSize);
+  const previewContext = preview.value.getContext("2d")
+  previewContext.imageSmoothingEnabled = false;
+  previewContext.scale(dotSize / 4, dotSize / 4);
 };
 
 onMounted(() => {
@@ -169,6 +173,13 @@ const renderPixel = () => {
   // offscreenCanvasの内容をキャンバスコンテキストに描画している
   context.drawImage(offscreenCanvas, 0, 0);
   context.restore();
+  // preview
+  const previewContext = preview.value.getContext('2d')
+  previewContext.clearRect(0, 0, canvasSize, canvasSize);
+  previewContext.save();
+  previewContext.drawImage(offscreenCanvas, 0, 0)
+  previewContext.restore();
+  // grid
   if (visibleGrid.value) {
     addGrid();
   }
@@ -194,10 +205,19 @@ const redo = () => {
 };
 
 const downloadImage = () => {
+  const visibleGridState = visibleGrid.value
+  if (visibleGridState) {
+    visibleGrid.value = false
+    renderPixel()
+  }
   const link = document.createElement("a");
   link.href = canvas.value.toDataURL();
   link.download = "image.png";
   link.click();
+  if (visibleGridState) {
+    visibleGrid.value = true
+    renderPixel()
+  }
 };
 
 const imageDataToUint32Array = (imageData: ImageData) => {
@@ -402,7 +422,7 @@ const saveColor = () => {
     <div>
       <div
         :class="{ pen: mode === 'pen', bucket: mode === 'bucket' }"
-        style="padding-top: 80px; padding-right: 160px; padding-bottom: 80px; float: right"
+        style="padding: 80px 160px; float: right"
         class="canvas"
         @mousemove="onCanvasMousemove"
         @mousedown="onCanvasMousedown"
@@ -417,6 +437,7 @@ const saveColor = () => {
       </div>
     </div>
     <div style="padding-top: 80px;">
+      <canvas ref="preview" width="128" height="128" style="border: 1px solid #000"></canvas>
       <input type="radio" name="mode" value="pen" id="pen" v-model="mode" />
       <label for="pen">pen</label>
       <input
