@@ -2,9 +2,9 @@
 const canvas = ref();
 const isClicked = ref(false);
 const canvasSize = 64;
-const dotSize = 8;
+const dotSize = 16;
 const coords = ref();
-const currentColor = ref("#000000");
+const currentColor = ref("#ff0000");
 const mode = ref("pen");
 const visibleGrid = ref(false);
 const pixels = ref();
@@ -14,6 +14,7 @@ const undoPixelsStates = ref([]);
 const redoPixelsStates = ref([]);
 const originalColor = ref<number | null>(null);
 const originalCoords = ref<{ x: number; y: number } | null>(null);
+const colorPallet = ref(['#ff0000'])
 pixels.value = new Uint32Array(canvasSize * canvasSize);
 
 const init = () => {
@@ -379,25 +380,45 @@ const colorToInt = (color: string, alpha: number = 255) => {
   const colorInt = ((alpha << 24) >>> 0) + (blue << 16) + (green << 8) + red;
   return colorInt;
 };
+
+const visibleModal = ref(false)
+const color = ref()
+const addColor = () => {
+  visibleModal.value = true
+}
+const saveColor = () => {
+  if (color.value && !colorPallet.value.includes(color.value)) {
+    colorPallet.value.push(color.value)
+  }
+  if (color.value) {
+    currentColor.value = color.value
+  }
+  visibleModal.value = false
+}
 </script>
 
 <template>
   <div class="container">
-    <div
-      style="padding-top: 80px; padding-left: 80px;"
-      @mousemove="onCanvasMousemove"
-      @mousedown="onCanvasMousedown"
-      @mouseup="onCanvasMouseup"
-    >
-      <canvas
-        ref="canvas"
-        :width="512"
-        :height="512"
-        style="border: 1px solid #000"
-      ></canvas>
-    </div>
     <div>
-      <input type="color" v-model="currentColor" />
+      <div
+        :class="{ pen: mode === 'pen', bucket: mode === 'bucket' }"
+        style="padding-top: 80px; padding-right: 160px; padding-bottom: 80px; float: right"
+        class="canvas"
+        @mousemove="onCanvasMousemove"
+        @mousedown="onCanvasMousedown"
+        @mouseup="onCanvasMouseup"
+      >
+        <canvas
+          ref="canvas"
+          :width="512"
+          :height="512"
+          style="border: 1px solid #000"
+        ></canvas>
+      </div>
+    </div>
+    <div style="padding-top: 80px;">
+      <input type="radio" name="mode" value="pen" id="pen" v-model="mode" />
+      <label for="pen">pen</label>
       <input
         type="radio"
         name="mode"
@@ -406,18 +427,36 @@ const colorToInt = (color: string, alpha: number = 255) => {
         v-model="mode"
       />
       <label for="bucket">bucket</label>
-      <input type="radio" name="mode" value="pen" id="pen" v-model="mode" />
-      <label for="pen">pen</label>
-      <p>{{ coords }}</p>
-      <button @click="downloadImage">Download</button>
-      <button @click="toggleGrid">Grid</button>
-      <button @click="clear">Clear</button>
-      <button @click="undo">Undo</button>
-      <button @click="redo">Redo</button>
-      <p>undo {{ undoPixelsStates.length }}</p>
-      <p v-for="pixel in undoPixelsStates">{{ pixel.data }}</p>
-      <p>redo {{ redoPixelsStates.length }}</p>
-      <p v-for="pixel in redoPixelsStates">{{ pixel.data }}</p>
+      <div class="color-pallet">
+        <div v-for="color in colorPallet">
+          <input type="radio" name="color" :id="color" :value="color" v-model="currentColor" class="color">
+          <label :for="color" class="label" :style="{backgroundColor : color}">
+            <img v-if="color === currentColor" src="~/assets/pencil.svg" width="24" height="24" alt="">
+          </label>
+        </div>
+      </div>
+      <div v-if="visibleModal">
+        <input type="color" v-model="color">
+        <button @click="saveColor">Save</button>
+      </div>
+      <div v-else>
+        <button @click="addColor">addColor</button>
+      </div>
+      <div>
+        <button @click="downloadImage">Download</button>
+      </div>
+      <div>
+        <button @click="toggleGrid">Grid</button>
+      </div>
+      <div>
+        <button @click="clear">Clear</button>
+      </div>
+      <div>
+        <button @click="undo">Undo</button>
+      </div>
+      <div>
+        <button @click="redo">Redo</button>
+      </div>
     </div>
   </div>
 </template>
@@ -425,7 +464,38 @@ const colorToInt = (color: string, alpha: number = 255) => {
 <style scoped>
 .container {
   display: grid;
-  grid-template-columns: 50% 50%;
+  grid-template-columns: 60% 40%;
   height: 100vh;
 }
+.color-pallet {
+  display: flex;
+}
+
+.color-pallet > * + * {
+  margin-left: 1rem;
+}
+
+.color {
+  display: none;
+}
+
+.label {
+  content: "";
+  display: grid;
+  justify-content: center;
+  align-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid #000;
+}
+
+.pen {
+  cursor: url("assets/pencil.svg") 0 12, default;
+}
+
+.bucket {
+  cursor: url("assets/fill.svg") 12 12, default;
+}
+
 </style>
