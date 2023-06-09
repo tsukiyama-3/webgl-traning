@@ -404,7 +404,7 @@ const colorToInt = (color: string, alpha: number = 255) => {
 };
 
 const visibleModal = ref(false)
-const color = ref()
+const color = ref('#000000')
 const addColor = () => {
   visibleModal.value = true
 }
@@ -495,7 +495,7 @@ const saveColor = () => {
 }
 
 .color-pallet > * + * {
-  margin-left: 1rem;
+  margin-left: 0.5rem;
 }
 
 .color {
