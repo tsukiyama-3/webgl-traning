@@ -76,8 +76,10 @@ const onCanvasMousedown = (event: MouseEvent) => {
     const endTime = performance.now();
     console.log(`fill実行時間: ${endTime - startTime} ミリ秒`);
   }
-  const originalPixelColor = getPixelColor(coords.value.x, coords.value.y);
-  originalColor.value = originalPixelColor;
+  if (containsPixel(coords.value.x, coords.value.y)) {
+    const originalPixelColor = getPixelColor(coords.value.x, coords.value.y);
+    originalColor.value = originalPixelColor;
+  }
 };
 
 // ピクセル座標を返す
@@ -191,16 +193,16 @@ const undo = () => {
       undoPixelsStates.value[undoPixelsStates.value.length - 2];
     pixels.value = imageDataToUint32Array(previousState);
     renderPixel();
-    redoPixelsStates.value.push(undoPixelsStates.value.pop());
+    redoPixelsStates.value.push(undoPixelsStates.value.pop()!);
   }
 };
 
 const redo = () => {
   if (redoPixelsStates.value.length > 0) {
     const nextState = redoPixelsStates.value.pop();
-    pixels.value = imageDataToUint32Array(nextState);
+    pixels.value = imageDataToUint32Array(nextState!);
     renderPixel();
-    undoPixelsStates.value.push(nextState);
+    undoPixelsStates.value.push(nextState!);
   }
 };
 
@@ -236,19 +238,19 @@ const imageDataToUint32Array = (imageData: ImageData) => {
   return pixelArray;
 };
 
-const uint32ArrayToImageData = (array, width, height) => {
+const uint32ArrayToImageData = (array, width: number, height: number) => {
   const canvas = document.createElement("canvas");
   const context = canvas.getContext("2d");
-  const imageData = context.createImageData(width, height);
-  const data = imageData.data;
+  const imageData = context?.createImageData(width, height);
+  const data = imageData?.data;
 
   // Uint32Array のデータを ImageData のデータにコピーする
   for (let i = 0, j = 0; i < array.length; i++, j += 4) {
     const pixel = array[i];
-    data[j] = pixel & 0xff; // Red コンポーネント
-    data[j + 1] = (pixel >> 8) & 0xff; // Green コンポーネント
-    data[j + 2] = (pixel >> 16) & 0xff; // Blue コンポーネント
-    data[j + 3] = (pixel >> 24) & 0xff; // Alpha コンポーネント
+    data![j] = pixel & 0xff; // Red コンポーネント
+    data![j + 1] = (pixel >> 8) & 0xff; // Green コンポーネント
+    data![j + 2] = (pixel >> 16) & 0xff; // Blue コンポーネント
+    data![j + 3] = (pixel >> 24) & 0xff; // Alpha コンポーネント
   }
 
   return imageData;
