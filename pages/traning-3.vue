@@ -361,8 +361,8 @@ const clear = () => {
 
 const getLinePixels = (x0: number, x1: number, y0: number, y1: number) => {
   const pixels = [];
-  x1 = normalize(x1, 0);
-  y1 = normalize(y1, 0);
+  // x1 = normalize(x1, 0);
+  // y1 = normalize(y1, 0);
   const dx = Math.abs(x1 - x0);
   const dy = Math.abs(y1 - y0);
   const sx = x0 < x1 ? 1 : -1;
